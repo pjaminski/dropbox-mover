@@ -1,0 +1,210 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "dropbox_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "dropbox"
+    },
+    "dropbox_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "piotr.jaminski@gmail.com"
+    },
+    "LogicAppLocation": {
+      "type": "string",
+      "minLength": 1,
+      "allowedValues": [
+        "[resourceGroup().location]",
+        "eastasia",
+        "southeastasia",
+        "centralus",
+        "eastus",
+        "eastus2",
+        "westus",
+        "northcentralus",
+        "southcentralus",
+        "northeurope",
+        "westeurope",
+        "japanwest",
+        "japaneast",
+        "brazilsouth",
+        "australiaeast",
+        "australiasoutheast",
+        "southindia",
+        "centralindia",
+        "westindia",
+        "canadacentral",
+        "canadaeast",
+        "uksouth",
+        "ukwest",
+        "westcentralus",
+        "westus2",
+        "koreacentral",
+        "koreasouth",
+        "francecentral",
+        "francesouth"
+      ],
+      "defaultValue": "westeurope"
+    },
+    "LogicAppName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "DropboxMover"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "Copy_file": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['dropbox']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/datasets/default/copyFile",
+                "queries": {
+                  "source": "@base64ToString(triggerOutputs()['headers']['x-ms-file-path-encoded'])",
+                  "destination": "/przesłane z aparatu/@{variables('FolderYear')}/@{variables('FolderMonth')}/@{base64ToString(triggerOutputs()['headers']['x-ms-file-name-encoded'])}",
+                  "overwrite": false,
+                  "queryParametersSingleEncoded": true
+                }
+              },
+              "runAfter": {
+                "Get_folder_Month_name_from_the_file_name": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Delete_file": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['dropbox']['connectionId']"
+                  }
+                },
+                "method": "delete",
+                "path": "/datasets/default/files/@{encodeURIComponent(encodeURIComponent(base64ToString(triggerOutputs()['headers']['x-ms-file-path-encoded'])))}"
+              },
+              "runAfter": {
+                "Copy_file": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Get_folder_Month_name_from_the_file_name": {
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "FolderMonth",
+                    "type": "String",
+                    "value": "@{substring(triggerOutputs()['headers']['x-ms-file-name'], 5, 2)}"
+                  }
+                ]
+              },
+              "runAfter": {
+                "Get_folder_Year_name_from_the_file_name": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Get_folder_Year_name_from_the_file_name": {
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "FolderYear",
+                    "type": "String",
+                    "value": "@substring(triggerOutputs()['headers']['x-ms-file-name'], 0, 4)"
+                  }
+                ]
+              },
+              "runAfter": {}
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            },
+            "$sourcepath": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_file_is_created": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['dropbox']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/datasets/default/triggers/onnewfile",
+                "queries": {
+                  "folderId": "id:_IcggUShmA8AAAAAAAAAAw",
+                  "queryParametersSingleEncoded": true,
+                  "inferContentType": true
+                }
+              },
+              "recurrence": {
+                "frequency": "Day",
+                "interval": 1
+              },
+              "metadata": {
+                "id:_IcggUShmA8AAAAAAAAAAw": "/przesłane z aparatu"
+              }
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "dropbox": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westeurope', '/managedApis/', 'dropbox')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('dropbox_1_Connection_Name'))]",
+                "connectionName": "[parameters('dropbox_1_Connection_Name')]"
+              }
+            }
+          }
+        }
+      },
+      "name": "[parameters('LogicAppName')]",
+      "type": "Microsoft.Logic/workflows",
+      "location": "[parameters('LogicAppLocation')]",
+      "tags": {
+        "displayName": "LogicApp"
+      },
+      "apiVersion": "2016-06-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('dropbox_1_Connection_Name'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('dropbox_1_Connection_Name')]",
+      "location": "westeurope",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westeurope', '/managedApis/', 'dropbox')]"
+        },
+        "displayName": "[parameters('dropbox_1_Connection_DisplayName')]"
+      }
+    }
+  ],
+  "outputs": {}
+}
