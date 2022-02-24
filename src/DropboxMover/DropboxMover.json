@@ -8,7 +8,7 @@
     },
     "dropbox_1_Connection_DisplayName": {
       "type": "string",
-      "defaultValue": "piotr.jaminski@gmail.com"
+      "defaultValue": "test@test.com
     },
     "LogicAppLocation": {
       "type": "string",
